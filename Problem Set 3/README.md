@@ -8,10 +8,27 @@
 ```
 for d = 1 to log2 n do 
 	for all k in parallel do 
-		if k >= 2^d  then 
+		if k >= 2^(d-1)  then 
 			x[out][k] = x[in][k – 2^(d-1)] + x[in][k]
 		else 
 			x[out][k] = x[in][k]
+	endforall
+	swap(in,out)
+endfor
+```
+It also can be done by **__syncthreads()**;  
+
+for d = 1 to log2 n do 
+	for all k in parallel do 
+		__syncthreads()
+		if k >= 2^(d-1)  then 
+			temp = x[k – 2^(d-1)] + x[k]
+		else 
+			temp = x[in][k]
+		__syncthreads
+		x[k] = temp
+	endforall
+endfor
 ```
 ----
 
