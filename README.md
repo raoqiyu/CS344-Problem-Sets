@@ -34,3 +34,10 @@ if( threadIdx.y < O_TILE_WIDTH && threadIdx.x < O_TILE_WIDTH && (row < numRows) 
 ```
 In ***gaussian_blur*** kernel function, I used shared memeory do get fast memeory access time.
 
+
+----
+
+Resource:  
+[GPU Gems 3](https://developer.nvidia.com/gpugems/GPUGems3)  
+[CMSC 828E: Seminar on Scientific Computing on Graphical Processors](http://www.umiacs.umd.edu/~ramani/cmsc828e_gpusci/)  
+[Heterogeneous Parallel Programming](https://www.coursera.org/course/hetero)  
