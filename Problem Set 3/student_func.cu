@@ -166,8 +166,8 @@ __global__ void prefixSum_HS(const unsigned int * const d_in, unsigned int * con
 	/*	Hillis Steele Scan
 		for d := 1 to log2n do
 			forall k in parallel do
-		 		if k ≥ 2d then
-					x[out][k] := x[in][k − 2d-1] + x[in][k]
+		 		if k ≥ 2^d then
+					x[out][k] := x[in][k − 2^d-1] + x[in][k]
 		 		else
 					x[out][k] := x[in][k]
 		 	swap(in,out) 
@@ -200,15 +200,28 @@ __global__ void prefixSum_HS(const unsigned int * const d_in, unsigned int * con
 	d_out[tid] = temp[pout*blockDim.x + tid];	
 }
 
-// Blelloch Scan
+
 __global__ void prefixSum_BL(const unsigned int * const d_in, unsigned int * const d_out)
 {
+	/* Blelloch Scan : Up-Sweep(reduce) + Down-Sweep
+		Up-Sweep:
+		for d := 0 to log2n - 1 do
+			for k from 0 to n – 1 by 2^d + 1 in parallel do
+				x[k + 2^(d + 1) - 1] := x[k + 2^d - 1] + x [k + 2^(d+1) - 1] 
 
+		Down-Sweep:
+		x[n - 1] := 0
+		for d := log2n down to 0 do
+		for k from 0 to n – 1 by 2d + 1 in parallel do
+			t := x[k + 2^d- 1]
+			x[k + 2^d - 1] := x [k + 2^(d+1) - 1]
+			x[k + 2^(d+1) - 1] := t + x [k + 2^(d+1) - 1] 
+	*/
 	extern __shared__ float partial[];
 
 	int tid = threadIdx.x;
 
-	// make sure all data in this block are loaded into shared shared memory
+	// make sure all data in this block are loaded into  shared memory
 	partial[tid] = d_in[tid];
 	__syncthreads();
 	
