@@ -17,7 +17,7 @@ for d = 1 to log2 n do
 endfor
 ```
 It also can be done by **__syncthreads()**;  
-
+```
 for d = 1 to log2 n do 
 	for all k in parallel do 
 		__syncthreads()
