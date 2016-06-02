@@ -41,5 +41,5 @@ for d = log2n – 1 down to 0 do
  
 ##### Reuce and Post Reduction Reverse
 Heterogeneous Parallel Programming : Lecture-4-6-work-efficient-scan-kernel  
-![](https://upload.wikimedia.org/wikipedia/commons/8/81/Prefix_sum_16.svg)
-Fig from [Prefix sum](https://en.wikipedia.org/wiki/Prefix_sum)
+![](https://upload.wikimedia.org/wikipedia/commons/8/81/Prefix_sum_16.svg)  
+Fig from [Prefix sum](https://en.wikipedia.org/wiki/Prefix_sum)  
