@@ -174,7 +174,7 @@ __global__ void prefixSum_HS(const unsigned int * const d_in, unsigned int * con
 		This version can handle arrays only as large as can be processed by a single thread block running 
 		on one multiprocessor of a GPU
 	*/
-	extern __shared__ int temp[];
+	extern __shared__ unsigned int temp[];
 
 	int tid = threadIdx.x;
 	int pout = 0, pin = 1;
@@ -201,64 +201,77 @@ __global__ void prefixSum_HS(const unsigned int * const d_in, unsigned int * con
 }
 
 
-__global__ void prefixSum_BL(const unsigned int * const d_in, unsigned int * const d_out)
+__global__ void prefixSum_BL(const unsigned int * const d_in, unsigned int * const d_out, const int nums)
 {
 	/* Blelloch Scan : Up-Sweep(reduce) + Down-Sweep
 		Up-Sweep:
 		for d := 0 to log2n - 1 do
-			for k from 0 to n – 1 by 2^d + 1 in parallel do
+			for k from 0 to n – 1 by 2^(d+1) in parallel do
 				x[k + 2^(d + 1) - 1] := x[k + 2^d - 1] + x [k + 2^(d+1) - 1] 
 
 		Down-Sweep:
 		x[n - 1] := 0
 		for d := log2n down to 0 do
-		for k from 0 to n – 1 by 2d + 1 in parallel do
-			t := x[k + 2^d- 1]
-			x[k + 2^d - 1] := x [k + 2^(d+1) - 1]
-			x[k + 2^(d+1) - 1] := t + x [k + 2^(d+1) - 1] 
+			for k from 0 to n – 1 by 2^(d+1) in parallel do
+				t := x[k + 2^d- 1]
+				x[k + 2^d - 1] := x [k + 2^(d+1) - 1]
+				x[k + 2^(d+1) - 1] := t + x [k + 2^(d+1) - 1] 
 	*/
-	extern __shared__ float partial[];
+	extern __shared__ unsigned int temp[];
 
 	int tid = threadIdx.x;
+	// exclusicve scan
+	
+	temp[2*tid] = d_in[2*tid];
+	if(2*tid+1 < nums)
+		temp[2*tid+1] = d_in[2*tid+1];
+	else
+		temp[2*tid+1] = 0;
 
 	// make sure all data in this block are loaded into shared memory
-	partial[tid] = d_in[tid];
 	__syncthreads();
 	
+	int stride = 1;
 	// reduce step
-	for(unsigned int stride = 1; stride < blockDim.x/2; stride <<= 1){
-		// first update all idx == 2n-1, then 4n-1, then 8n-1 ...  
-		// finaly blockDim.x/2 * n - 1(only 1 value will be updated partial[blockDim.x-1])
-		int idx = (tid+1)*stride*2 - 1;
-		if( idx  < blockDim.x)
-			partial[idx] += partial[idx-stride];
+	for(unsigned int d = blockDim.x; d > 0; d >>= 1){
+		if(tid < d){	
+			int idx1 = (2*tid+1)*stride - 1;
+			int idx2 = (2*tid+2)*stride - 1;
+			temp[idx2] += temp[idx1];
+		}
+		stride *= 2;
 		// make sure all operations at one stage are done!
 		__syncthreads();
 	}
 
 	// Downsweep Step
 	// set identity value
-	if(tid == blockDim.x-1)
-		partial[tid] = 0;
-	for(unsigned int stride = blockDim.x/2; stride > 0; stride >>= 1){
-		
-		if( (tid+1) % (stride*2) == 0){
-			unsigned int temp = partial[tid-stride];
-			partial[tid-stride] = partial[tid];
-			partial[tid] += temp;
-		}
+	if(tid == 0)
+		temp[nums-1] = 0;
+	for(unsigned int d = 1; d < nums; d <<= 1){
+		stride >>= 1;
 		// make sure all operations at one stage are done!
 		__syncthreads();
+		if( tid < d){
+			int idx1 = (2*tid+1)*stride - 1;
+			int idx2 = (2*tid+2)*stride - 1;
+			unsigned int tmp  = temp[idx1];
+			temp[idx1] = temp[idx2];
+			temp[idx2] += tmp;
+		}		
 	}
-
-	d_out[tid] = partial[tid];	
+	// make sure all operations at the last  stage are done!
+	__syncthreads();
+	d_out[2*tid] = temp[2*tid];
+	if(2*tid+1 < nums)
+		d_out[2*tid+1] = temp[2*tid+1];
 }
 
 // Scan algorithm from Course : Hetergeneous Parallel Programming
 __global__ void prefixSum_HPP(const unsigned int * const d_in, unsigned int * const d_out, const int nums)
 {
 
-	extern __shared__ int temp[];
+	extern __shared__ unsigned int temp[];
 
 	int tid = threadIdx.x;
 
@@ -351,7 +364,8 @@ void your_histogram_and_prefixsum(const float* const d_logLuminance,
 	
 	// Step 4 : prefix sum
 	//prefixSum_HS<<<1, numBins, numBins*sizeof(unsigned int)>>>(d_bins, d_cdf);
-	prefixSum_HPP<<<1, ceil(numBins/2), numBins*sizeof(unsigned int)>>>(d_bins, d_cdf, numBins);
+	//prefixSum_HPP<<<1, ceil(numBins/2), numBins*sizeof(unsigned int)>>>(d_bins, d_cdf, numBins);
+	prefixSum_BL<<<1, ceil(numBins/2), numBins*sizeof(unsigned int)>>>(d_bins, d_cdf, numBins);
 	// free GPU memory allocation
 	checkCudaErrors(cudaFree(d_bins));
 }
