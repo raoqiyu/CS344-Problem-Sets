@@ -35,8 +35,11 @@ for d = log2n – 1 down to 0 do
 		x[k +  2^d  – 1] = x[k +  2^(d+1) – 1]
 		x[k +  2^(d+1) – 1] = t +  x[k +  2^(d+1) – 1]
  ```
+ 
+ Figs and pseudocode  above are from [GPU Gems 3: Chapter 39. Parallel Prefix Sum (Scan) with CUDA](http://http.developer.nvidia.com/GPUGems3/gpugems3_ch39.html)
  ----
  
 ##### Reuce and Post Reduction Reverse
 Heterogeneous Parallel Programming : Lecture-4-6-work-efficient-scan-kernel  
 ![](https://upload.wikimedia.org/wikipedia/commons/8/81/Prefix_sum_16.svg)
+Fig from [Prefix sum](https://en.wikipedia.org/wiki/Prefix_sum)
