@@ -221,7 +221,7 @@ __global__ void prefixSum_BL(const unsigned int * const d_in, unsigned int * con
 
 	int tid = threadIdx.x;
 
-	// make sure all data in this block are loaded into  shared memory
+	// make sure all data in this block are loaded into shared memory
 	partial[tid] = d_in[tid];
 	__syncthreads();
 	
@@ -255,24 +255,35 @@ __global__ void prefixSum_BL(const unsigned int * const d_in, unsigned int * con
 }
 
 // Scan algorithm from Course : Hetergeneous Parallel Programming
-__global__ void prefixSum_HPP(const unsigned int * const d_in, unsigned int * const d_out)
+__global__ void prefixSum_HPP(const unsigned int * const d_in, unsigned int * const d_out, const int nums)
 {
 
-	extern __shared__ float partial[];
+	extern __shared__ int temp[];
 
 	int tid = threadIdx.x;
 
+	// exclusicve scan
+	if(tid == 0){
+		temp[2*tid] = 0;
+		temp[2*tid+1] = d_in[2*tid];	
+	}
+	else{
+		temp[2*tid] = d_in[2*tid-1];
+		if(2*tid+1 < nums)
+			temp[2*tid+1] = d_in[2*tid];
+		else
+			temp[2*tid+1] = 0;
+	}
 	// make sure all data in this block are loaded into shared shared memory
-	partial[tid] = d_in[tid];
 	__syncthreads();
 	
 	// Reduction Phase
-	for(unsigned int stride = 1; stride < blockDim.x/2; stride <<= 1){
+	for(unsigned int stride = 1; stride <= blockDim.x; stride <<= 1){
 		// first update all idx == 2n-1, then 4n-1, then 8n-1 ...  
 		// finaly 2(blockDim.x/2) * n - 1(only 1 value will be updated partial[blockDim.x-1])
 		int idx = (tid+1)*stride*2 - 1;
-		if( idx  < blockDim.x)
-			partial[idx] += partial[idx-stride];
+		if( idx  < 2*blockDim.x)
+			temp[idx] += temp[idx-stride];
 		// make sure all operations at one stage are done!
 		__syncthreads();
 	}
@@ -284,22 +295,22 @@ __global__ void prefixSum_HPP(const unsigned int * const d_in, unsigned int * co
 	//			(stride == 1 == blockDim.x/8, idx == (0+1)*1*2-1=1,(1+1)*1*2-1=3, (2+1)*1*2-1=5, 3 threads do calculation)
 
 	// Post Reduction Reverse Phase
-	for(unsigned int stride = blockDim.x/4; stride > 0; stride >>= 1){
+	for(unsigned int stride = blockDim.x/2; stride > 0; stride >>= 1){
 		// first update all idx == 2(blockDim.x/4) * n - 1 + blockDim.x/4, 
 		// then 2(blockDim.x/8)n-1+blockDim.x/8, then 2(blockDim.x/16)n-1 + blockDim.x/16...  
 		// finaly 2 * n - 1
 		int idx = (tid+1)*stride*2 - 1;
-		if( idx + stride  < blockDim.x)
-			partial[idx + stride] += partial[idx];
+		if( idx + stride  < 2*blockDim.x)
+			temp[idx + stride] += temp[idx];
 		// make sure all operations at one stage are done!
 		__syncthreads();
 	}
 
 	// exclusive scan
-	if(tid == 0)
-		d_out[tid] = 0;
-	else
-		d_out[tid] = partial[tid-1];	
+
+	d_out[2*tid] = temp[2*tid];
+	if(2*tid+1 < nums)
+		d_out[2*tid+1] = temp[2*tid+1];
 }
 
 void your_histogram_and_prefixsum(const float* const d_logLuminance,
@@ -339,8 +350,8 @@ void your_histogram_and_prefixsum(const float* const d_logLuminance,
 	hist<<<numRows, numCols>>>(d_logLuminance, d_bins, logLumRange, min_logLum, numBins);
 	
 	// Step 4 : prefix sum
-	prefixSum_HS<<<1, numBins, numBins*sizeof(unsigned int)*2>>>(d_bins, d_cdf);
-
+	//prefixSum_HS<<<1, numBins, numBins*sizeof(unsigned int)>>>(d_bins, d_cdf);
+	prefixSum_HPP<<<1, ceil(numBins/2), numBins*sizeof(unsigned int)>>>(d_bins, d_cdf, numBins);
 	// free GPU memory allocation
 	checkCudaErrors(cudaFree(d_bins));
 }
