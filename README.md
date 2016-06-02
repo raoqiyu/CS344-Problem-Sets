@@ -1,7 +1,7 @@
 cs344
 =====
-
-Introduction to Parallel Programming class Problem Sets
+Solutions for Problem Sets  
+<https://cn.udacity.com/course/intro-to-parallel-programming--cs344/>
 
 ----
 
