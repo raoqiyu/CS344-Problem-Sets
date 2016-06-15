@@ -345,10 +345,10 @@ void your_histogram_and_prefixsum(const float* const d_logLuminance,
        the cumulative distribution of luminance values (this should go in the
        incoming d_cdf pointer which already has been allocated for you)       */
 
-
 	
 	// Step 1 : find minimum and maximum value
 	reduce(d_logLuminance, min_logLum, max_logLum, numRows, numCols);
+
 
 	// Step 2: find the range 
 	float logLumRange = max_logLum - min_logLum;
